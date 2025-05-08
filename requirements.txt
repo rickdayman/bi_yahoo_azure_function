@@ -3,7 +3,7 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 azure-functions
-yfinance
+yfinance==0.2.58
 pandas
 numpy
 azure.storage.blob
