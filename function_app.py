@@ -94,8 +94,6 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
     allholders = pd.DataFrame()
     allinfo = pd.DataFrame()
     symbols = [x for x in symbols if x not in fx_gold_oil]
-    symbol_count = len(symbols)
-    symbol_counter = 0
 
     for symbol in symbols:
         try:
@@ -113,12 +111,6 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
         except:
             print("Error on ticker - " + symbol)
             continue
-
-        # symbol_counter = symbol_counter + 1
-        # percent_bucket = int(symbol_count / 10)
-        # if(symbol_counter % percent_bucket == 0):
-        #     print_time = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
-        #     print(print_time + ': ' + str(int(symbol_counter / percent_bucket * 10)) + ' % complete')
 
     allinfo = allinfo.reset_index()
 
