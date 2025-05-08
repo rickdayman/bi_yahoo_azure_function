@@ -123,8 +123,8 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
     database = 'YAHOO'
     username = os.environ["DATABASE_YAHOO_USERNAME"]
     password = os.environ["DATABASE_YAHOO_PASSWORD"]
-    #driver= '{ODBC Driver 18 for SQL Server}'
-    driver= '{ODBC Driver 17 for SQL Server}' # to run locally
+    driver= '{ODBC Driver 18 for SQL Server}'
+    #driver= '{ODBC Driver 17 for SQL Server}' # to run locally
 
     try:
         quoted = urllib.parse.quote_plus('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE='+database+';UID='+username+';PWD='+ password + ';Encrypt=no;TrustServerCertificate=no;')
