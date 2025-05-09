@@ -8,7 +8,7 @@ from azure.storage.blob import BlobServiceClient
 import pyodbc
 from sqlalchemy import create_engine
 from io import StringIO
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import urllib
 import os
 
@@ -41,15 +41,33 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
     tickers_list = pd.read_csv(StringIO(downloaded_csv.readall()))
 
     #################################################################################################
+    # get start date from vw_ohlc_incremental_date
+    #################################################################################################
+
+    # Get Azure SQL details
+    server = 'azrickdaymanserver.database.windows.net'
+    database = 'YAHOO'
+    username = os.environ["DATABASE_YAHOO_USERNAME"]
+    password = os.environ["DATABASE_YAHOO_PASSWORD"]
+    driver= '{ODBC Driver 18 for SQL Server}'
+    #driver= '{ODBC Driver 17 for SQL Server}' # to run locally
+
+    quoted = urllib.parse.quote_plus('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE='+database+';UID='+username+';PWD='+ password + ';Encrypt=no;TrustServerCertificate=no;')
+    engine = create_engine('mssql+pyodbc:///?odbc_connect={}'.format(quoted), fast_executemany=True)
+
+    df_inc_date = pd.read_sql_query("SELECT incremental_date FROM dbo.vw_ohlc_incremental_date", con=engine)
+    startdate = df_inc_date.at[0, 'incremental_date']
+    ta_startdate = startdate + timedelta(days=-49)
+
+    #################################################################################################
     # get daily ohlc data from yahoo
     #################################################################################################
 
-    startdate = '2019-12-31'
     fx_gold_oil = ['GC=F','GBPUSD=X','EURUSD=X','USDJPY=X', 'CL=F', '^GSPC', 'BTC-USD']
     symbols = tickers_list['symbol'].to_list()
     symbols = symbols + fx_gold_oil
 
-    df_data = pd.DataFrame(yf.download(symbols, start = startdate, threads = True, proxy = None, group_by = 'ticker'))
+    df_data = pd.DataFrame(yf.download(symbols, start = ta_startdate, threads = True, proxy = None, group_by = 'ticker'))
 
     df_data = df_data.stack(level=0, future_stack = True).rename_axis(['Date', 'Ticker']).reset_index()
     df_data['Date'] = pd.to_datetime(df_data['Date'], format = '%Y-%m-%d').dt.tz_localize(None)
@@ -67,8 +85,7 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
     df_data['percent_increase'] = df_data.apply(lambda x: (x.close - x.previous_close) / x.previous_close, axis=1)
     df_data['percent_increase_multipler'] = df_data.apply(lambda x: 1 + ((x.close - x.previous_close) / x.previous_close), axis=1)
 
-    date_filter = datetime.strptime(startdate, '%Y-%m-%d')
-    df_data = df_data[df_data.date != date_filter]
+    df_data = df_data[df_data.date > startdate]
 
     #################################################################################################
     ## Connect to azure blob storage - upload csv
@@ -117,14 +134,6 @@ def http_trigger_az_get_yahoo_data(req: func.HttpRequest) -> func.HttpResponse:
     #################################################################################################
     ## Add data to Azure SQL server
     #################################################################################################
-
-    # Get Azure SQL details
-    server = 'azrickdaymanserver.database.windows.net'
-    database = 'YAHOO'
-    username = os.environ["DATABASE_YAHOO_USERNAME"]
-    password = os.environ["DATABASE_YAHOO_PASSWORD"]
-    driver= '{ODBC Driver 18 for SQL Server}'
-    #driver= '{ODBC Driver 17 for SQL Server}' # to run locally
 
     try:
         quoted = urllib.parse.quote_plus('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE='+database+';UID='+username+';PWD='+ password + ';Encrypt=no;TrustServerCertificate=no;')
